@@ -1,0 +1,68 @@
+---
+title: "Analyse COVID-19 Italia"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggforce)
+library(ggmap)
+library(maps)
+library(gganimate)
+library(lubridate)
+```
+
+```{r load-data}
+province_files <- list.files(path = "../COVID-19/dati-province/",pattern = ".csv")
+all_provinces <- read_csv("../COVID-19/dati-province/dpc-covid19-ita-province.csv")
+```
+
+```{r clean-name-province}
+table(all_provinces$denominazione_provincia)
+
+all_provinces <- all_provinces %>%
+  filter(!(denominazione_provincia %in% "In fase di definizione/aggiornamento"))
+```
+
+
+```{r load-maps}
+# Get the world polygon and extract UK
+italy <- map_data("world") %>% 
+  filter(region=="Italy")
+
+cities <- world.cities %>% 
+  filter(country.etc=="Italy")
+```
+
+
+```{r map-start-end}
+start_frame <- tibble(
+  data = as.Date('2020-02-23'),
+  totale_casi = 0, lon = 0, lat = 0)
+
+end_date <- c(max(all_provinces$data) + ddays(1),
+              max(all_provinces$data) + ddays(2))
+
+end_frame <- tibble(
+  data = as.Date(end_date),
+  totale_casi = 0, lon = 0, lat = 0)
+```
+
+
+```{r map-cases}
+max_casi <- max(all_provinces$totale_casi)
+
+all_provinces_se <- bind_rows(all_provinces) %>%
+  dplyr::rename(date = data)
+
+
+start_map = ggplot() +
+  geom_polygon(data = italy, aes(x=long, y = lat, group = group), fill="grey", alpha=0.3) +
+  geom_point(data=all_provinces_se, aes(x=long, y=lat, size=totale_casi),colour = "red", alpha = 0.5)
+
+
+start_map + transition_time(date)
+```
+
