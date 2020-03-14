@@ -12,20 +12,21 @@ library(ggmap)
 library(maps)
 library(gganimate)
 library(lubridate)
+library(png)
+library(gifski)
+library(viridis)
 ```
 
 ```{r load-data}
-province_files <- list.files(path = "../COVID-19/dati-province/",pattern = ".csv")
-all_provinces <- read_csv("../COVID-19/dati-province/dpc-covid19-ita-province.csv")
+#province_files <- list.files(path = "../COVID-19/dati-province/",pattern = ".csv")
+#all_provinces <- read_csv("../COVID-19/dati-province/dpc-covid19-ita-province.csv")
+url = "https://github.com/pcm-dpc/COVID-19/blob/master/dati-province/dpc-covid19-ita-province.csv"
+#dir.create("data",showWarnings = FALSE)
+#download.file(url, destfile)
+
+destfile = file.path("data",basename(url))
+all_provinces <- readr::read_csv(destfile)
 ```
-
-```{r clean-name-province}
-table(all_provinces$denominazione_provincia)
-
-all_provinces <- all_provinces %>%
-  filter(!(denominazione_provincia %in% "In fase di definizione/aggiornamento"))
-```
-
 
 ```{r load-maps}
 # Get the world polygon and extract UK
@@ -34,6 +35,13 @@ italy <- map_data("world") %>%
 
 cities <- world.cities %>% 
   filter(country.etc=="Italy")
+```
+
+
+```{r clean-names,include=FALSE}
+table(all_provinces$denominazione_provincia)
+all_provinces <- all_provinces %>%
+  filter(!(denominazione_provincia %in% "In fase di definizione/aggiornamento"))
 ```
 
 
@@ -57,12 +65,31 @@ max_casi <- max(all_provinces$totale_casi)
 all_provinces_se <- bind_rows(all_provinces) %>%
   dplyr::rename(date = data)
 
+mybreaks <- round(seq(0, max(all_provinces_se$totale_casi), length.out = 5))
+min_lat <- min(all_provinces_se$lat)
+max_lat <- max(all_provinces_se$lat)
+min_long <- min(all_provinces_se$long)
+max_long <- max(all_provinces_se$long)
+min_cases <- min(all_provinces_se$totale_casi)
+max_cases <- max(all_provinces_se$totale_casi)
 
 start_map = ggplot() +
-  geom_polygon(data = italy, aes(x=long, y = lat, group = group), fill="grey", alpha=0.3) +
-  geom_point(data=all_provinces_se, aes(x=long, y=lat, size=totale_casi),colour = "red", alpha = 0.5)
+  geom_polygon(data = italy, aes(x= long, y = lat, group = group), fill="grey", alpha=0.3) +
+  geom_point(data=all_provinces_se, aes(x= long, y= lat, size = totale_casi, colour=totale_casi), shape=20, stroke=FALSE, alpha = 0.7) +
+    scale_color_viridis(option="magma", breaks= mybreaks, name="Totale casi (in K)" ) +
+  scale_size_continuous(name="Totale casi (in K)", range=c(1,12), breaks=mybreaks) +
+    theme_void()  + coord_map() + 
+    guides( colour = guide_legend(), size = "none") +
+    ggtitle("COVID-19 Italy")+
+  theme(
+      text = element_text(color = "#22211d"),
+      plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+      panel.background = element_rect(fill = "#f5f5f2", color = NA), 
+      legend.background = element_rect(fill = "#f5f5f2", color = NA),
+      plot.title = element_text(size= 16, hjust=0.1, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    )+
+  labs(title = 'Totale casi: {frame_time}') +
+  transition_time(date)
 
-
-start_map + transition_time(date)
+start_map
 ```
-
